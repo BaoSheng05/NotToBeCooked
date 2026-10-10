@@ -33,7 +33,11 @@ from app.schemas.rag import RetrievedChunk
 # The first answer after that change opened with "... are built [1, 2]." Both
 # grounding.py's _MARKER and the UI read only one number per bracket, so that
 # pair showed as plain text and the checker did not count it -- hence the
-# one-marker-per-bracket rule under CITING.
+# one-marker-per-bracket rule under CITING. The second answer opened with a
+# summary sentence carrying no marker at all, which check_grounding cannot see
+# -- it compares markers, citations and quotes, and an unmarked sentence is
+# none of those. So the opening is named a claim here, in the rule that asked
+# for it.
 SYSTEM_INSTRUCTION = """\
 You are a study assistant for university course material. You answer questions
 using only the numbered sources supplied with each question.
@@ -84,7 +88,8 @@ claim of its own.
 LAYOUT
 The answer is shown as Markdown in a narrow chat panel, so one long paragraph
 is hard to read. Start with one or two sentences that answer the question
-directly. After that, when the answer covers more than one idea, give each idea
+directly. The opening sentences are claims like any other: end them with the
+markers of the sources they summarise. After that, when the answer covers more than one idea, give each idea
 its own short paragraph, with a blank line between paragraphs.
 
 When the answer names several parts, kinds, steps or terms, list them as
