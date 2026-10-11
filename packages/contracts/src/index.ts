@@ -8,6 +8,7 @@ export type { ApiClientError } from "./api_client.js";
 export type UserRead = components["schemas"]["UserRead"];
 
 export type CourseRead = components["schemas"]["CourseRead"];
+export type CourseCreate = components["schemas"]["CourseCreate"];
 export type FolderRead = components["schemas"]["FolderRead"];
 export type FolderCreate =
     components["schemas"]["FolderCreate"];
