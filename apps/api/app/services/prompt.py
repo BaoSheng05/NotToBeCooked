@@ -4,6 +4,8 @@ Pure functions only: no network, no settings, no event loop. What goes into
 the context block is dictated by what `Citation` must be able to carry back.
 """
 
+import re
+
 from app.schemas.rag import RetrievedChunk
 
 # Rewritten 6 September 2026 after measuring the loose version against Gemini.
@@ -38,6 +40,11 @@ from app.schemas.rag import RetrievedChunk
 # -- it compares markers, citations and quotes, and an unmarked sentence is
 # none of those. So the opening is named a claim here, in the rule that asked
 # for it.
+#
+# 11 October 2026: EARLIER IN THIS CONVERSATION added (US-14). Every turn used
+# to reach the model alone, so the acceptance test's follow-up "what are its
+# drawbacks?" had no "it". The history is context for reading the question,
+# never a source -- an answer that cited it could not be checked.
 #
 # 11 October 2026, on the VM: "hi what is nlp" was withheld as UNVERIFIED. The
 # lecture slide reads "Or Natural Language Understand (NLU)"; the model quoted
@@ -106,6 +113,13 @@ the end of the sentence or bullet it supports.
 Use a heading (a line starting with "### ") only when the answer has three or
 more separate parts. An answer of one or two sentences needs no bullets and no
 headings.
+
+EARLIER IN THIS CONVERSATION
+Some questions arrive with the conversation so far, under CONVERSATION SO FAR.
+Use it only to work out what the question refers to: "it", "that method", "the
+second one". It is not a source. Never cite it, and never state a fact because
+it appears there; every claim still comes from the numbered sources, with their
+markers. If the sources do not cover what the question refers to, say so.
 
 WHEN THE SOURCES DO NOT ANSWER THE QUESTION
 If none of the sources are relevant to the question, do not answer it. Set
@@ -231,3 +245,33 @@ def build_context(
         blocks.append(f"{header}\n{chunk.content}")
 
     return "\n\n".join(blocks), selected
+
+
+# How many earlier question-and-answer pairs reach the model with a follow-up.
+# Two is enough for "it" and "the second one"; more spends prompt on turns the
+# question is unlikely to point back to.
+HISTORY_TURNS = 2
+
+_MARKER = re.compile(r"\s?\[\d+\]")
+
+
+def render_history(turns: list[tuple[str, str | None]]) -> str:
+    """The CONVERSATION SO FAR block, or "" when there is nothing before this turn.
+
+    Each turn is (question, answer). The answer is None when that turn was not
+    grounded -- a refusal or a withheld answer explains nothing about what the
+    student meant, and repeating UNVERIFIED's wording would only add noise.
+    Markers are stripped: [1] in an old answer named a source list that is not
+    the one in front of the model now.
+    """
+    if not turns:
+        return ""
+    lines = [
+        "CONVERSATION SO FAR (to understand the question only; not a source, never cite it)",
+        "",
+    ]
+    for question, answer in turns:
+        lines.append(f"Student: {' '.join(question.split())}")
+        if answer is not None:
+            lines.append(f"Assistant: {' '.join(_MARKER.sub('', answer).split())}")
+    return "\n".join(lines) + "\n\n"
