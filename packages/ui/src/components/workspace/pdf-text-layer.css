@@ -1,0 +1,60 @@
+/*
+ * The part of pdf.js's web/pdf_viewer.css that its TextLayer needs (pdfjs-dist
+ * 6.3.289). The whole file is 164 KB and sets dozens of :root variables, so it
+ * is not imported. The text layer is transparent text laid exactly over the
+ * canvas: it makes the page selectable and gives a quote something to mark.
+ */
+.ntbc-pdf-page {
+  --user-unit: 1;
+  --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
+
+.ntbc-pdf-page .textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  transform-origin: 0 0;
+  z-index: 0;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.ntbc-pdf-page .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.ntbc-pdf-page .textLayer > :not(.markedContent),
+.ntbc-pdf-page .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+    scale(var(--min-font-size-inv));
+}
+
+.ntbc-pdf-page .textLayer .markedContent {
+  display: contents;
+}
+
+.ntbc-pdf-page .textLayer ::selection {
+  background: rgb(0 100 255 / 0.25);
+}
+
+/* The cited quote (US-13). */
+.ntbc-pdf-page .textLayer .ntbc-quote {
+  background: rgb(227 166 63 / 0.45);
+  border-radius: 2px;
+}

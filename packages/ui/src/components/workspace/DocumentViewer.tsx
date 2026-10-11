@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react"
+import React, { Suspense, lazy, useCallback, useMemo, useState } from "react"
 import { AlertCircle, Clock3, LoaderCircle } from "lucide-react"
 import { api } from "@workspace/contracts"
 import type { MockDocumentFile } from "../../types/course"
@@ -6,6 +6,9 @@ import type { Tab } from "../../store/workspace"
 import type { CitationItem } from "../chat/Chat"
 import { useFileContent } from "../../hooks/useFileContent"
 import { DocumentContentState } from "./DocumentContentState"
+
+// pdf.js and its worker load only when a PDF is opened (US-13).
+const PdfViewer = lazy(() => import("./PdfViewer"))
 
 export interface DocumentViewerProps {
   document: MockDocumentFile
@@ -44,6 +47,23 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = React.memo(
       selectedCitation &&
       selectedCitation.f === document.id &&
       (selectedCitation.p === page || !selectedCitation.p)
+
+    const pageQuotes = useMemo(
+      () =>
+        isCitationOnCurrentPage && selectedCitation
+          ? (selectedCitation.quotes ??
+            (selectedCitation.quote ? [selectedCitation.quote] : []))
+          : [],
+      [isCitationOnCurrentPage, selectedCitation]
+    )
+    // Which quotes pdf.js could not place on the page; their card stays up
+    // as the fallback. Keyed by the quotes, so a new citation starts unknown.
+    const [missedQuotes, setMissedQuotes] = useState<string | null>(null)
+    const quoteKey = pageQuotes.join("\u0000")
+    const handleQuoteFound = useCallback(
+      (found: boolean) => setMissedQuotes(found ? null : quoteKey),
+      [quoteKey]
+    )
 
     const downloadOriginal = useCallback(async () => {
       setIsDownloading(true)
@@ -241,21 +261,35 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = React.memo(
                 </div>
               )}
 
-              {selectedCitation?.quote && isCitationOnCurrentPage && (
-                <div className="mb-4 rounded-lg border border-(--cite-line,rgba(227,166,63,0.4)) bg-(--cite-bg,rgba(227,166,63,0.12)) p-4 text-xs leading-relaxed text-(--tx-strong,#EDF2F6) shadow-sm">
-                  <span className="mb-1.5 block font-mono text-[11px] font-semibold text-(--cite,#E3A63F) uppercase">
-                    Verified Grounded Quote
-                  </span>
-                  <em>"{selectedCitation.quote}"</em>
-                </div>
-              )}
+              {selectedCitation?.quote &&
+                isCitationOnCurrentPage &&
+                missedQuotes === quoteKey && (
+                  <div className="mb-4 rounded-lg border border-(--cite-line,rgba(227,166,63,0.4)) bg-(--cite-bg,rgba(227,166,63,0.12)) p-4 text-xs leading-relaxed text-(--tx-strong,#EDF2F6) shadow-sm">
+                    <span className="mb-1.5 block font-mono text-[11px] font-semibold text-(--cite,#E3A63F) uppercase">
+                      Verified Grounded Quote
+                    </span>
+                    <em>"{selectedCitation.quote}"</em>
+                  </div>
+                )}
 
-              <iframe
-                key={`${contentUrl}:${page}:${zoomLevel}`}
-                src={`${contentUrl}#page=${page}&zoom=${zoomLevel}`}
-                title={document.name}
-                className="min-h-[32rem] w-full flex-1 rounded-sm border border-(--line,#25313E) bg-white"
-              />
+              {contentUrl && (
+                <Suspense
+                  fallback={
+                    <DocumentContentState
+                      variant="loading"
+                      fileName={document.name}
+                    />
+                  }
+                >
+                  <PdfViewer
+                    url={contentUrl}
+                    page={page}
+                    zoom={zoomLevel}
+                    quotes={pageQuotes}
+                    onQuoteFound={handleQuoteFound}
+                  />
+                </Suspense>
+              )}
             </>
           )}
         </div>
