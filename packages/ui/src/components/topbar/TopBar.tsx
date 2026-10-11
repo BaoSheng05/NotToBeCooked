@@ -235,8 +235,10 @@ export function TopBar({
         />
       )}
 
-      {/* Center: Brand Logo & Title */}
-      <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2 sm:pointer-events-auto">
+      {/* Center: Brand Logo & Title. Absolutely centred, so it takes no room
+          from the course selectors -- and below 1280 px a long course name
+          ran underneath it. Hidden there; the selectors matter more. */}
+      <div className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 items-center gap-2 sm:pointer-events-auto xl:flex">
         <img
           src="/ntbc-logo.png"
           alt="NotToBeCooked Logo"
