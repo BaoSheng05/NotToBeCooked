@@ -5,6 +5,7 @@ import {
   type CitationItem,
 } from "./ChatMessage"
 import { ChatInput, type ChatFile } from "./ChatInput"
+import { QUICK_PROMPTS, type QuickPrompt } from "../../lib/chatRequest"
 import { History, type ChatSessionItem } from "./History"
 import { CitationDrawer } from "./CitationDrawer"
 import { Plus, Clock, Trash2, GripVertical, X } from "lucide-react"
@@ -16,7 +17,7 @@ export interface ChatProps {
   filesCount?: number
   files?: ChatFile[]
   categories?: string[]
-  quickPrompts?: string[]
+  quickPrompts?: QuickPrompt[]
   scopeFile?: ChatFile | null
 
   // Controlled or uncontrolled message state
@@ -68,7 +69,7 @@ export const Chat: React.FC<ChatProps> = ({
     "Lab Handouts",
     "Tutorials & PYQs",
   ],
-  quickPrompts = ["Condense", "Quiz me", "Simplify", "Storyboard"],
+  quickPrompts = QUICK_PROMPTS,
   scopeFile = null,
   messages: controlledMessages,
   initialMessages,
@@ -415,10 +416,10 @@ export const Chat: React.FC<ChatProps> = ({
                       key={idx}
                       type="button"
                       disabled={isTyping}
-                      onClick={() => handleSend(q)}
+                      onClick={() => handleSend(q.message)}
                       className="group flex cursor-pointer items-center justify-between rounded-lg border border-(--line,#25313E) bg-(--bg-raise,#1C2833) px-2.5 py-1.5 text-left text-xs text-(--tx-dim,#8B98A7) transition-colors hover:border-(--acc-deep,#1D5D8A) hover:text-(--tx,#DCE3EA) focus-visible:border-(--acc,#52A8EA) focus-visible:ring-2 focus-visible:ring-(--acc,#52A8EA)/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <span>{q}</span>
+                      <span>{q.label}</span>
                       <span className="text-(--tx-faint,#5C6976) transition-colors group-hover:text-(--acc,#52A8EA)">
                         ↗
                       </span>
