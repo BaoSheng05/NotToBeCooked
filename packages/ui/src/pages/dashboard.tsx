@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { api, type CourseCreate } from "@workspace/contracts"
 import { useAuth } from "../context/auth-context"
 import {
   useWorkspace,
@@ -85,6 +87,15 @@ export function DashboardPage({ platform = "web" }: DashboardPageProps = {}) {
     updateFolderMutation,
     deleteFolderMutation,
   } = useExplorerMutations(activeCourseId)
+
+  const queryClient = useQueryClient()
+  // US-01. Refetch the list before switching: the "initialize course" effect
+  // below sends any id it cannot find in the list back to courses[0].
+  const handleCreateCourse = async (data: CourseCreate) => {
+    const created = await api.courses.create(data)
+    await queryClient.invalidateQueries({ queryKey: ["courses"], exact: true })
+    switchCourse(created.id)
+  }
 
   const courses = useMemo(
     () => (coursesQuery.data ?? []).map(toUiCourse),
@@ -423,6 +434,7 @@ export function DashboardPage({ platform = "web" }: DashboardPageProps = {}) {
           courses={courses}
           userEmail={user?.email}
           onSwitchCourse={(id) => switchCourse(id)}
+          onCreateCourse={handleCreateCourse}
           onLogout={() => logout()}
         />
 
