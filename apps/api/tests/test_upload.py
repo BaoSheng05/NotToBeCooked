@@ -126,6 +126,24 @@ async def test_upload_writes_bytes_and_row_that_agree(ctx):
 
 
 @pytest.mark.asyncio
+async def test_upload_logs_its_size_and_server_time(ctx, caplog):
+    """The evidence the 11 October slow upload did not leave behind."""
+    client, _maker, (_user_id, _course_id, folder_id) = ctx
+
+    with caplog.at_level("INFO", logger="app.routers.files"):
+        r = await client.post(
+            "/files",
+            data={"folder_id": str(folder_id)},
+            files={"upload": ("L1.pdf", PDF, "application/pdf")},
+        )
+
+    assert r.status_code == 201
+    line = next(m for m in caplog.messages if m.startswith("upload stored:"))
+    assert f"bytes={len(PDF)}" in line
+    assert "server_seconds=" in line
+
+
+@pytest.mark.asyncio
 async def test_upload_into_someone_elses_folder_is_404_not_403(ctx):
     """A stranger must not be able to tell a real folder id from a made-up one."""
     client, _maker, _ids = ctx

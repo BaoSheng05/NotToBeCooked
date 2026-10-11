@@ -643,7 +643,7 @@ export function DashboardPage({ platform = "web" }: DashboardPageProps = {}) {
         initialCategory={uploadCategory}
         isDirectFolderUpload={isDirectFolderUpload}
         onClose={() => setIsUploadModalOpen(false)}
-        onUploadSuccess={async (category, file) => {
+        onUploadSuccess={async (category, file, onProgress) => {
           const destinationFolder = apiFolders.find(
             (folder) => folder.name === category
           )
@@ -655,16 +655,20 @@ export function DashboardPage({ platform = "web" }: DashboardPageProps = {}) {
           const uploadedFile = await uploadFileMutation.mutateAsync({
             folderId: destinationFolder.id,
             file,
+            onProgress,
           })
 
-          try {
-            await ingestFileMutation.mutateAsync(uploadedFile.id)
-            showToast(`Uploaded ${file.name}. Indexing started.`)
-          } catch {
-            showToast(
-              `Uploaded ${file.name}, but indexing could not start. Retry from the file menu.`
+          // Started, not awaited: the file is uploaded once the API has it,
+          // and the modal can say so. Indexing reports through the toast
+          // and the file's status badge.
+          void ingestFileMutation
+            .mutateAsync(uploadedFile.id)
+            .then(() => showToast(`Uploaded ${file.name}. Indexing started.`))
+            .catch(() =>
+              showToast(
+                `Uploaded ${file.name}, but indexing could not start. Retry from the file menu.`
+              )
             )
-          }
         }}
       />
     </div>
