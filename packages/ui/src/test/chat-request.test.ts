@@ -1,6 +1,6 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
-import { classifyChatRequest } from "../lib/chatRequest.ts"
+import { QUICK_PROMPTS, classifyChatRequest } from "../lib/chatRequest.ts"
 
 describe("chat request classification", () => {
   it("treats a natural whole-file explanation as a document summary", () => {
@@ -41,13 +41,21 @@ describe("chat request classification", () => {
     assert.equal(result.intent, "document_summary")
   })
 
-  it("scopes every document quick action to the open file", () => {
-    for (const prompt of ["Quiz me", "Simplify", "Storyboard"]) {
-      const result = classifyChatRequest(prompt)
-      assert.deepEqual(result, {
-        intent: "document_summary",
-        scopesCurrentDocument: true,
-      })
-    }
+  it("routes each quick prompt by the message it sends, not its label", () => {
+    const routed = Object.fromEntries(
+      QUICK_PROMPTS.map((q) => [q.label, classifyChatRequest(q.message)])
+    )
+    assert.deepEqual(routed, {
+      Condense: { intent: "document_summary", scopesCurrentDocument: true },
+      "Quiz me": { intent: "question", scopesCurrentDocument: true },
+      Simplify: { intent: "document_summary", scopesCurrentDocument: true },
+    })
+  })
+
+  it("offers no Storyboard chip", () => {
+    assert.deepEqual(
+      QUICK_PROMPTS.map((q) => q.label),
+      ["Condense", "Quiz me", "Simplify"]
+    )
   })
 })

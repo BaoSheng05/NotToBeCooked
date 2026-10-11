@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react"
 import { ArrowUp } from "lucide-react"
+import type { QuickPrompt } from "../../lib/chatRequest"
 
 export interface ChatFile {
   id: string
@@ -10,7 +11,7 @@ export interface ChatFile {
 export interface ChatInputProps {
   files?: ChatFile[]
   categories?: string[]
-  quickPrompts?: string[]
+  quickPrompts?: QuickPrompt[]
   isTyping?: boolean
   disabled?: boolean
   placeholder?: string
@@ -259,10 +260,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               key={idx}
               type="button"
               disabled={isTyping || disabled}
-              onClick={() => handleSubmit(q)}
+              onClick={() => handleSubmit(q.message)}
               className="cursor-pointer rounded-full bg-(--bg-raise,#1C2833) px-2.5 py-0.5 text-[11px] text-(--tx-dim,#8B98A7) [outline:none] transition-colors outline-none hover:bg-(--bg-hover,#213040) hover:text-(--tx,#DCE3EA) focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {q}
+              {q.label}
             </button>
           ))}
         </div>

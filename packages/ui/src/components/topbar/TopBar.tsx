@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { MockCourse } from "../../types/course"
 import { UserProfileDropdown } from "../profile/UserProfileDropdown"
-import { ChevronDown, Search } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 
 export interface TopBarProps {
   platform?: "web" | "tauri"
@@ -24,7 +24,6 @@ export function TopBar({
   const [openYearDropdown, setOpenYearDropdown] = useState(false)
   const [openSemDropdown, setOpenSemDropdown] = useState(false)
   const [openCourseDropdown, setOpenCourseDropdown] = useState(false)
-  const [globalSearch, setGlobalSearch] = useState("")
 
   const selectedYear = currentCourse.year || 1
   const selectedSem = currentCourse.semester || 1
@@ -215,22 +214,10 @@ export function TopBar({
         </span>
       </div>
 
-      {/* Right: Search Bar & User Profile */}
+      {/* Right: User Profile. A search box sat here until 11 October 2026;
+          nothing read what was typed into it (US-03 is not built), so it was
+          removed rather than left looking like a working search. */}
       <div className="flex items-center gap-3">
-        <div className="flex w-64 items-center gap-2 rounded-lg border border-(--line-soft,#1B2530) bg-(--bg-raise,#1C2833)/70 px-3 py-1.5 text-xs text-(--tx-faint,#5C6976) transition-colors focus-within:border-(--acc,#52A8EA)/50 focus-within:bg-(--bg-raise,#1C2833) md:w-80 lg:w-96">
-          <Search className="h-3.5 w-3.5 shrink-0 text-(--tx-faint,#5C6976)" />
-          <input
-            type="text"
-            value={globalSearch}
-            onChange={(e) => setGlobalSearch(e.target.value)}
-            placeholder="Search across all course files..."
-            className="w-full bg-transparent text-xs text-(--tx,#DCE3EA) outline-none placeholder:text-(--tx-faint,#5C6976)"
-          />
-          <kbd className="shrink-0 rounded border border-(--line,#25313E) bg-(--bg-bar,#101821) px-1.5 py-0.5 font-mono text-[10px]">
-            ⌘K
-          </kbd>
-        </div>
-
         <UserProfileDropdown onLogout={onLogout} />
       </div>
     </header>
