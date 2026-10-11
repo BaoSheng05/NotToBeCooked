@@ -41,7 +41,15 @@ export function SharedMainApp({ platform }: { platform: "web" | "tauri" }) {
           <Router>
             <AuthProvider>
               <Routes>
-                <Route path="*" element={<Navigate to="/register" replace />} />
+                {/* Unknown paths, "/" included, go to the dashboard: a signed-in
+                    user lands on it, and ProtectedLayout sends anyone else to
+                    /login. Until 11 October 2026 this pointed at /register,
+                    which on the VM greets every visitor with a closed sign-up
+                    form (ALLOW_REGISTRATION is off there). */}
+                <Route
+                  path="*"
+                  element={<Navigate to="/dashboard" replace />}
+                />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/login" element={<LoginPage />} />
 
