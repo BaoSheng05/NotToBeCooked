@@ -78,15 +78,19 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = React.memo(
         aria-hidden={!isVisible}
       >
         {/* Document Viewer Control Bar */}
-        <div className="flex items-center justify-between border-b border-(--line-soft,#1B2530) bg-(--bg-panel,#121A23)/40 px-4 py-2.5 text-xs">
+        {/* A container query, not a screen breakpoint: what runs out of room
+            is this pane, whose width depends on the explorer and chat beside
+            it. At 960 px wide the size label wrapped onto three lines over the
+            page buttons (acceptance test, 11 October 2026). */}
+        <div className="@container flex items-center justify-between border-b border-(--line-soft,#1B2530) bg-(--bg-panel,#121A23)/40 px-4 py-2.5 text-xs">
           <div className="flex min-w-0 items-center gap-2.5">
             <span
-              className="min-w-0 truncate text-sm font-semibold text-(--tx,#DCE3EA)"
+              className="hidden min-w-0 truncate text-sm font-semibold text-(--tx,#DCE3EA) @sm:block"
               title={document.name}
             >
               {document.name}
             </span>
-            <span className="rounded-md bg-(--bg-raise,#1C2833) px-2 py-0.5 font-mono text-[11px] text-(--tx-faint,#5C6976)">
+            <span className="hidden shrink-0 rounded-md bg-(--bg-raise,#1C2833) px-2 py-0.5 font-mono text-[11px] whitespace-nowrap text-(--tx-faint,#5C6976) @xl:inline-block">
               {document.size} · {document.totalPages} pages
             </span>
           </div>

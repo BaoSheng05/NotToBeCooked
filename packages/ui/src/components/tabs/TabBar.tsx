@@ -1,4 +1,4 @@
-import React, { useCallback } from "react"
+import React, { useCallback, useEffect, useRef } from "react"
 import type { Tab } from "../../store/workspace"
 import { TabItem } from "./TabItem"
 
@@ -40,6 +40,16 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
       }
     }, [])
 
+    // Bring the active tab into view when it changes. With several tabs in a
+    // narrow pane, a newly opened file's tab landed past the right edge and
+    // the row gave no sign it was there.
+    const rowRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+      rowRef.current
+        ?.querySelector('[aria-selected="true"]')
+        ?.scrollIntoView({ inline: "nearest", block: "nearest" })
+    }, [activeFileId, tabs.length])
+
     if (tabs.length === 0) {
       return null
     }
@@ -52,6 +62,7 @@ export const TabBar: React.FC<TabBarProps> = React.memo(
       >
         {/* Scrollable Tabs Row */}
         <div
+          ref={rowRef}
           onWheel={handleWheel}
           className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none overscroll-contain"
         >
