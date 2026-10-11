@@ -4,6 +4,7 @@ import {
     type TokenResponse,
     type UserRead,
     type CourseRead,
+    type CourseCreate,
     type FolderRead,
     type FolderCreate,
     type FolderUpdate,
@@ -227,6 +228,14 @@ const isFormData =
         list: (): Promise<CourseRead[]> =>
             this.request<CourseRead[]>("/courses", {
                 method: "GET",
+            }),
+
+        // 409 when the user already has this code in that year and semester
+        // (an archived course still holds its code); the message says so.
+        create: (data: CourseCreate): Promise<CourseRead> =>
+            this.request<CourseRead>("/courses", {
+                method: "POST",
+                body: JSON.stringify(data),
             }),
     }
 
