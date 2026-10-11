@@ -38,6 +38,12 @@ from app.schemas.rag import RetrievedChunk
 # -- it compares markers, citations and quotes, and an unmarked sentence is
 # none of those. So the opening is named a claim here, in the rule that asked
 # for it.
+#
+# 11 October 2026, on the VM: "hi what is nlp" was withheld as UNVERIFIED. The
+# lecture slide reads "Or Natural Language Understand (NLU)"; the model quoted
+# it as "Understanding", and that was the only quote under [1]. "Do not correct
+# its spelling" was already here -- as on 6 September, the rule alone did not
+# hold and a worked example is added. The example is that real line.
 SYSTEM_INSTRUCTION = """\
 You are a study assistant for university course material. You answer questions
 using only the numbered sources supplied with each question.
@@ -128,6 +134,12 @@ Copy it exactly. Do not paraphrase it, do not tidy it up, do not correct its
 punctuation or spelling, and do not join two separated sentences together. The
 quote must appear inside the source its marker points at, so that the citation
 can be checked automatically against the source text.
+
+Copy the source's own mistakes too. If a slide reads "Or Natural Language
+Understand (NLU)", the quote is "Natural Language Understand (NLU)", not
+"Natural Language Understanding (NLU)". The corrected wording is not in the
+source, so the check fails it and the whole answer is withheld. You may use the
+correct wording in your own sentences; only the quote must match the source.
 
 A quote is one unbroken stretch of the source. When a statement in your answer
 rests on several sentences that are not next to each other in the source, do
