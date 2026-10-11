@@ -18,18 +18,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../dialog"
+import { ACCEPT_ATTRIBUTE, isSupportedUpload } from "../../lib/uploadTypes"
 
 type UploadStage = "initial" | "selected" | "uploading" | "complete"
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024
-const ALLOWED_EXTENSIONS = new Set(["pdf", "md", "markdown", "doc", "docx"])
 
 function fileKey(file: File): string {
   return `${file.name}:${file.size}`
-}
-
-function fileExtension(filename: string): string {
-  return filename.split(".").pop()?.toLowerCase() ?? ""
 }
 
 interface UploadModalProps {
@@ -87,7 +83,7 @@ export function UploadModal({
     const accepted: File[] = []
 
     files.forEach((file) => {
-      if (!ALLOWED_EXTENSIONS.has(fileExtension(file.name))) {
+      if (!isSupportedUpload(file.name)) {
         messages.push(`${file.name}: unsupported file type.`)
         return
       }
@@ -250,14 +246,14 @@ export function UploadModal({
                 Drop files here or browse
               </span>
               <span className="font-mono text-[10px] text-(--tx-faint,#5C6976)">
-                PDF, Markdown and DOCX · Maximum 50 MB per file
+                PDF, PPTX, DOCX, Markdown and TXT · Maximum 50 MB per file
               </span>
               <input
                 ref={inputRef}
                 type="file"
                 multiple
                 className="sr-only"
-                accept=".pdf,.md,.markdown,.doc,.docx"
+                accept={ACCEPT_ATTRIBUTE}
                 onChange={(event) =>
                   addFiles(Array.from(event.target.files ?? []))
                 }
