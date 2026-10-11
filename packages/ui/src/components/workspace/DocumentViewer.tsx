@@ -6,6 +6,7 @@ import type { Tab } from "../../store/workspace"
 import type { CitationItem } from "../chat/Chat"
 import { useFileContent } from "../../hooks/useFileContent"
 import { DocumentContentState } from "./DocumentContentState"
+import { TextPreview } from "./TextPreview"
 
 export interface DocumentViewerProps {
   document: MockDocumentFile
@@ -38,7 +39,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = React.memo(
       state: contentState,
       url: contentUrl,
       retry: retryContent,
-    } = useFileContent(document.id, isVisible && previewState !== "unsupported")
+    } = useFileContent(document.id, isVisible && previewState === "ready")
 
     const isCitationOnCurrentPage =
       selectedCitation &&
@@ -143,7 +144,20 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = React.memo(
 
         {/* Document Canvas Content Area */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-(--bg-canvas,#161F29) p-6 md:p-8 lg:p-10">
-          {previewState === "unsupported" ? (
+          {previewState === "text" ? (
+            <TextPreview
+              fileId={document.id}
+              fileName={document.name}
+              status={document.status}
+              page={page}
+              citation={
+                selectedCitation?.f === document.id ? selectedCitation : null
+              }
+              isVisible={isVisible}
+              isDownloading={isDownloading}
+              onDownload={() => void downloadOriginal()}
+            />
+          ) : previewState === "unsupported" ? (
             <DocumentContentState
               variant="unsupported"
               fileName={document.name}

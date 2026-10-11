@@ -141,6 +141,27 @@ class IngestionRequest(SQLModel):
     file_id: UUID
 
 
+class FileTextPassage(SQLModel):
+    """One indexed chunk, as the reader shows it."""
+
+    page_start: int | None = None
+    page_end: int | None = None
+    text: str
+
+
+class FileText(SQLModel):
+    """GET /files/{file_id}/text -- the text the AI reads, in document order.
+
+    The preview for every format the browser cannot render itself (DOCX, PPTX,
+    Markdown, plain text). It is the indexed chunks rather than the original
+    file on purpose: a citation's quote was verified against exactly this text,
+    so the reader can always find and highlight it here.
+    """
+
+    file_id: UUID
+    passages: list[FileTextPassage]
+
+
 class IngestionResponse(SQLModel):
     """Outbound shape for POST /files/{file_id}/ingest.
 

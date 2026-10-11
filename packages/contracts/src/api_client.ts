@@ -9,6 +9,7 @@ import {
     type FolderCreate,
     type FolderUpdate,
     type FileRead,
+    type FileText,
     type FileUpdate,
     type IngestionResponse,
     type ApiError,
@@ -476,6 +477,13 @@ const isFormData =
             this.request<Blob>(
                 `/files/${encodeURIComponent(fileId)}/content`,
                 { parseAs: "blob" }
+            ),
+
+        /** The indexed text, for formats the browser cannot render. 409 before indexing. */
+        text: (fileId: string): Promise<FileText> =>
+            this.request<FileText>(
+                `/files/${encodeURIComponent(fileId)}/text`,
+                { method: "GET" }
             ),
     }
 

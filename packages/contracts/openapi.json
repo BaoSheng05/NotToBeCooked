@@ -396,6 +396,58 @@
         }
       }
     },
+    "/files/{file_id}/text": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Get File Text",
+        "description": "The file's active ingestion run, chunk by chunk. US-08.\n\nAdded 11 October 2026: the acceptance test found DOCX and Markdown files\ncould not be previewed at all -- the reader only knew how to hand a PDF to\nthe browser. 409 rather than 404 before indexing: the file exists, its\ntext just does not yet.",
+        "operationId": "get_file_text_files__file_id__text_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileText"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The file has not been indexed yet"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/files/{file_id}/content": {
       "get": {
         "tags": [
@@ -2122,6 +2174,65 @@
         ],
         "title": "FileRead",
         "description": "Outbound shape for a file."
+      },
+      "FileText": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "passages": {
+            "items": {
+              "$ref": "#/components/schemas/FileTextPassage"
+            },
+            "type": "array",
+            "title": "Passages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "passages"
+        ],
+        "title": "FileText",
+        "description": "GET /files/{file_id}/text -- the text the AI reads, in document order.\n\nThe preview for every format the browser cannot render itself (DOCX, PPTX,\nMarkdown, plain text). It is the indexed chunks rather than the original\nfile on purpose: a citation's quote was verified against exactly this text,\nso the reader can always find and highlight it here."
+      },
+      "FileTextPassage": {
+        "properties": {
+          "page_start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Start"
+          },
+          "page_end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page End"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "FileTextPassage",
+        "description": "One indexed chunk, as the reader shows it."
       },
       "FileUpdate": {
         "properties": {

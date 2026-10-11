@@ -25,7 +25,14 @@ from app.dependencies.auth import get_current_user
 from app.schemas.chunk import Chunk
 from app.schemas.course import Course
 from app.schemas.file import File as FileRow
-from app.schemas.file import FileRead, FileStatus, FileUpdate, IngestionResponse
+from app.schemas.file import (
+    FileRead,
+    FileStatus,
+    FileText,
+    FileTextPassage,
+    FileUpdate,
+    IngestionResponse,
+)
 from app.schemas.folder import Folder
 from app.schemas.ingestion_run import IngestionRun, IngestionRunStatus
 from app.services.processing import NoExtractableContentError, run_ingestion
@@ -428,6 +435,54 @@ async def update_file(
     await session.commit()
     await session.refresh(file_row)
     return FileRead.model_validate(file_row)
+
+
+@files_router.get(
+    "/{file_id}/text",
+    response_model=FileText,
+    responses={409: {"description": "The file has not been indexed yet"}},
+)
+async def get_file_text(
+    file_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    user: dict = Depends(get_current_user),
+) -> FileText:
+    """The file's active ingestion run, chunk by chunk. US-08.
+
+    Added 11 October 2026: the acceptance test found DOCX and Markdown files
+    could not be previewed at all -- the reader only knew how to hand a PDF to
+    the browser. 409 rather than 404 before indexing: the file exists, its
+    text just does not yet.
+    """
+    user_id = UUID(user["sub"])
+    owned = (
+        select(FileRow.id)
+        .join(Folder, col(FileRow.folder_id) == col(Folder.id))
+        .join(Course, col(Folder.course_id) == col(Course.id))
+        .where(col(Course.user_id) == user_id, col(FileRow.id) == file_id)
+    )
+    if (await session.exec(owned)).first() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    statement = (
+        select(Chunk.page_start, Chunk.page_end, Chunk.content)
+        .join(IngestionRun, col(Chunk.ingestion_run_id) == col(IngestionRun.id))
+        .where(col(Chunk.file_id) == file_id, col(IngestionRun.is_active).is_(True))
+        .order_by(col(Chunk.chunk_index))
+    )
+    rows = (await session.exec(statement)).all()
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This file has not been indexed yet, so there is no text to show.",
+        )
+    return FileText(
+        file_id=file_id,
+        passages=[
+            FileTextPassage(page_start=start, page_end=end, text=content)
+            for start, end, content in rows
+        ],
+    )
 
 
 @files_router.get("/{file_id}/content", response_class=FileResponse)

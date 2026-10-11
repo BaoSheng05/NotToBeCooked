@@ -44,7 +44,29 @@ export function toUiFiles(
     size: formatFileSize(file.size_bytes),
     status: file.status,
     errorMessage: file.error_message,
-    previewState:
-      file.mime_type === "application/pdf" ? "ready" : "unsupported",
+    previewState: previewStateFor(file.filename, file.mime_type),
   }))
+}
+
+const TEXT_PREVIEW_EXTENSIONS = new Set([
+  "docx",
+  "pptx",
+  "md",
+  "markdown",
+  "txt",
+])
+
+/**
+ * PDFs go to the browser's own renderer; the formats it cannot draw are shown
+ * from their indexed text (US-08). Decided by extension as well as MIME type:
+ * browsers send an empty type for .md, which the API stores as
+ * application/octet-stream.
+ */
+export function previewStateFor(
+  filename: string,
+  mimeType: string
+): "ready" | "text" | "unsupported" {
+  const extension = filename.split(".").pop()?.toLowerCase() ?? ""
+  if (mimeType === "application/pdf" || extension === "pdf") return "ready"
+  return TEXT_PREVIEW_EXTENSIONS.has(extension) ? "text" : "unsupported"
 }

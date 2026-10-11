@@ -15,6 +15,7 @@ export type FolderCreate =
 export type FolderUpdate =
     components["schemas"]["FolderUpdate"];
 export type FileRead = components["schemas"]["FileRead"];
+export type FileText = components["schemas"]["FileText"];
 export type FileUpdate = components["schemas"]["FileUpdate"];
 export type IngestionResponse =
     components["schemas"]["IngestionResponse"];
