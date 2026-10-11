@@ -1,6 +1,6 @@
 import React from "react"
 import { MarkdownContent } from "./MarkdownContent"
-import { FileText, Folder, Check } from "lucide-react"
+import { FileText, Folder, Check, RotateCcw, Search } from "lucide-react"
 
 import {
   type CitationItem,
@@ -18,6 +18,10 @@ export interface ChatMessage {
   cites?: CitationItem[]
   citations?: CitationItem[]
   grounded?: boolean
+  /** Files the turn's request named; null or empty means the whole course. */
+  mentionedFileIds?: string[] | null
+  /** "Searched only X.pdf" -- set on assistant turns (US-12). */
+  scopeLabel?: string
   isOptimistic?: boolean
   status?: "pending" | "sent" | "error"
   createdAt?: string | Date
@@ -26,6 +30,8 @@ export interface ChatMessage {
 export interface ChatMessageProps {
   message: ChatMessage
   onCiteClick?: (cite: CitationItem) => void
+  /** Shown as "Ask again" under the answer when set (US-11). */
+  onRetry?: () => void
   className?: string
 }
 
@@ -71,6 +77,7 @@ export function renderMentionized(text: string): React.ReactNode {
 export const ChatMessageItem: React.FC<ChatMessageProps> = ({
   message,
   onCiteClick,
+  onRetry,
   className = "",
 }) => {
   const isMe = message.role === "user" || message.r === "me"
@@ -128,6 +135,27 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
           </div>
         )}
       </div>
+
+      {!isMe && (message.scopeLabel || onRetry) && (
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 pt-0.5 text-[10.5px] text-(--tx-faint,#5C6976)">
+          {message.scopeLabel && (
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <Search className="h-2.5 w-2.5 shrink-0" />
+              <span className="truncate">{message.scopeLabel}</span>
+            </span>
+          )}
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 font-medium text-(--acc,#52A8EA) hover:bg-(--bg-hover,#213040)"
+            >
+              <RotateCcw className="h-2.5 w-2.5" />
+              Ask again
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

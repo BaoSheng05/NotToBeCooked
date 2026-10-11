@@ -6,6 +6,7 @@ import {
 } from "./ChatMessage"
 import { ChatInput, type ChatFile } from "./ChatInput"
 import { QUICK_PROMPTS, type QuickPrompt } from "../../lib/chatRequest"
+import { retryTarget } from "../../lib/answerMeta"
 import { History, type ChatSessionItem } from "./History"
 import { CitationDrawer } from "./CitationDrawer"
 import { Plus, Clock, Trash2, GripVertical, X } from "lucide-react"
@@ -33,6 +34,8 @@ export interface ChatProps {
   isTyping?: boolean
 
   // Callbacks
+  /** Resend a question with the files it named (US-11 "Ask again"). */
+  onRetryMessage?: (text: string, fileIds: string[] | null) => Promise<void>
   onSendMessage?: (
     text: string
   ) =>
@@ -78,6 +81,7 @@ export const Chat: React.FC<ChatProps> = ({
   activeSessionTitle,
   isTyping: controlledIsTyping,
   onSendMessage,
+  onRetryMessage,
   onCiteClick,
   onSelectSession,
   onDeleteSession,
@@ -122,6 +126,8 @@ export const Chat: React.FC<ChatProps> = ({
 
   const isTyping =
     controlledIsTyping !== undefined ? controlledIsTyping : localIsTyping
+
+  const retry = isTyping ? null : retryTarget(currentMessages)
 
   // Horizontal Drag Resizing effect
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -436,6 +442,13 @@ export const Chat: React.FC<ChatProps> = ({
                   key={m.id || idx}
                   message={m}
                   onCiteClick={handleCitationClick}
+                  onRetry={
+                    retry &&
+                    onRetryMessage &&
+                    idx === currentMessages.length - 1
+                      ? () => void onRetryMessage(retry.text, retry.fileIds)
+                      : undefined
+                  }
                 />
               ))}
 
