@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -17,6 +18,23 @@ DEFAULT_COURSE_FOLDERS = (
     "Past Year Papers",
     "Other",
 )
+
+
+def _duplicate_course(code: str, year: int, sem: int) -> HTTPException:
+    """uq_course_user_code_year_sem, said in words the form can show.
+
+    Until 11 October 2026 the IntegrityError went out as a 500, so adding a
+    course twice read as the server breaking. An archived course holds its
+    code too -- deleting archives, it does not remove -- hence the second
+    sentence.
+    """
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=(
+            f"You already have {code} in Year {year}, Semester {sem}. "
+            "If you deleted it earlier, it still holds that code."
+        ),
+    )
 
 
 @courses_router.post(
@@ -40,7 +58,11 @@ async def create_course(
     )
 
     session.add(course)
-    await session.flush()
+    try:
+        await session.flush()
+    except IntegrityError:
+        await session.rollback()
+        raise _duplicate_course(data.code, data.year, data.sem) from None
     if course.id is None:
         raise RuntimeError("Course ID was not generated")
     folders = [
@@ -111,7 +133,14 @@ async def update_course(
     if data.status is not None:
         course.status = data.status
 
-    await session.commit()
+    # Read before the commit: a rollback expires the row, and touching an
+    # expired attribute afterwards is a lazy load an async session cannot do.
+    key = (course.code, course.year, course.sem)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise _duplicate_course(*key) from None
     await session.refresh(course)
     return CourseRead.model_validate(course)
 
