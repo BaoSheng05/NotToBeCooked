@@ -300,6 +300,23 @@ export function DashboardPage({ platform = "web" }: DashboardPageProps = {}) {
     openCitation(activeCourseId, cite.f, targetFile.name, cite.p)
   }
 
+  // US-11. Resends a question that got no grounded answer, with the files it
+  // named then -- not whatever document happens to be open now.
+  const handleRetryMessage = async (text: string, fileIds: string[] | null) => {
+    try {
+      await sendMessage(text, {
+        intent: classifyChatRequest(text).intent,
+        fileIds: fileIds ?? undefined,
+      })
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? `Couldn't send message: ${error.message}`
+          : "Couldn't send message. Please try again."
+      )
+    }
+  }
+
   const handleSendMessage = async (text: string) => {
     try {
       const chatRequest = classifyChatRequest(text)
@@ -591,6 +608,7 @@ export function DashboardPage({ platform = "web" }: DashboardPageProps = {}) {
               activeSessionId={activeConversationId}
               isTyping={isSending}
               onSendMessage={handleSendMessage}
+              onRetryMessage={handleRetryMessage}
               onSelectSession={(id) => selectSession(id)}
               onDeleteSession={(id) => deleteSession(id)}
               onNewChat={() => startNewChat()}

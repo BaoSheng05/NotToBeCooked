@@ -11,6 +11,7 @@ import {
   groupCitations,
 } from "../components/chat/ChatMessage"
 import { extractMentionsAndResolve, type FileItem } from "../lib/mentions"
+import { describeScope } from "../lib/answerMeta"
 
 export type FilesInput =
   | FileItem[]
@@ -261,6 +262,12 @@ export const useChatSession = (courseId: string | null, files?: FilesInput) => {
       content: msgRead.content,
       isOptimistic: msgRead.id.startsWith("temp-"),
       status: msgRead.id.startsWith("temp-") ? "pending" : "sent",
+      grounded: msgRead.grounded,
+      mentionedFileIds: msgRead.mentioned_file_ids,
+      scopeLabel:
+        msgRead.role === "assistant"
+          ? describeScope(msgRead.mentioned_file_ids, lookupName)
+          : undefined,
       citations: groupCitations(
         msgRead.citations as Array<Record<string, unknown>> | null | undefined,
         lookupName
