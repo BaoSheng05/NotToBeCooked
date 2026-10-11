@@ -95,6 +95,19 @@ UNVERIFIED = (
     "of the document at a time."
 )
 
+# What the reader sees when the model cited nothing but still claimed the
+# sources cover part of the question (`uncovered` set). Found 11 October 2026:
+# asked about rrf_k, the model answered with no markers and no citations, and
+# the reader got UNVERIFIED -- "citations could not be checked" -- when there
+# were no citations to check. Not REFUSAL either: GLOSSARY.md defines rrf_k, so
+# "the material does not cover this" would be false. What is true is that no
+# passage was found to stand behind an answer.
+NOTHING_CITED = (
+    "No passage in your material could be found to support an answer, so none "
+    "is shown. Try naming the document with @, or asking with the words the "
+    "material uses."
+)
+
 # What the reader sees when the call to the model itself failed -- a timeout, a
 # 5xx, a safety block. It used to be REFUSAL, which tells the reader their
 # material has no answer when nobody has looked at the material at all; the same

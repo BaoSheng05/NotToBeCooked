@@ -19,7 +19,7 @@ from app.dependencies.auth import get_current_user
 from app.routers import rag as rag_module
 from app.schemas.chat import ChatRole, Conversation
 from app.schemas.rag import RetrievedChunk
-from app.services.llm import GENERATION_FAILED, REFUSAL, UNVERIFIED, LlmAnswer
+from app.services.llm import GENERATION_FAILED, NOTHING_CITED, REFUSAL, UNVERIFIED, LlmAnswer
 
 USER_ID = uuid4()
 COURSE_ID = uuid4()
@@ -270,7 +270,8 @@ def test_a_named_gap_reaches_the_response_and_the_stored_turn(client, monkeypatc
 
 def test_a_gap_declared_with_no_citations_costs_the_whole_answer(client, monkeypatch):
     """The model says the sources cover part of the question and then cites
-    none of them. Both claims cannot be true, so neither is sent."""
+    none of them. Both claims cannot be true, so neither is sent -- and the
+    reader is told nothing was found, not that citations failed a check."""
 
     async def inconsistent(*, question, context, sources, **_kwargs):
         return LlmAnswer(
@@ -284,10 +285,30 @@ def test_a_gap_declared_with_no_citations_costs_the_whole_answer(client, monkeyp
 
     body = client.post("/rag/query", json={"question": "Indexes?"}).json()
 
-    assert body["answer"] == UNVERIFIED
+    assert body["answer"] == NOTHING_CITED
     assert body["grounded"] is False
     assert body["uncovered"] is None
     assert _assistant_turn(client).uncovered is None
+
+
+def test_a_gap_with_a_marker_but_no_citation_is_still_unverified(client, monkeypatch):
+    """[1] in the text with nothing listed behind it is a citation that failed,
+    so this one keeps UNVERIFIED."""
+
+    async def dangling(*, question, context, sources, **_kwargs):
+        return LlmAnswer(
+            answer="Partial indexes are smaller [1].",
+            grounded=True,
+            citations=[],
+            uncovered="The sources do not cover B-tree range scans.",
+        )
+
+    monkeypatch.setattr(rag_module, "generate_answer", dangling)
+
+    body = client.post("/rag/query", json={"question": "Indexes?"}).json()
+
+    assert body["answer"] == UNVERIFIED
+    assert body["grounded"] is False
 
 
 def test_an_ungrounded_answer_carries_no_gap(client, monkeypatch):

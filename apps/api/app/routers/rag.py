@@ -36,9 +36,15 @@ from app.schemas.rag import (
 )
 from app.services.chat import get_or_create_conversation
 from app.services.embeddings import embed_query
-from app.services.grounding import check_grounding, drop_unreferenced, drop_unverified
+from app.services.grounding import (
+    check_grounding,
+    drop_unreferenced,
+    drop_unverified,
+    extract_markers,
+)
 from app.services.llm import (
     GENERATION_FAILED,
+    NOTHING_CITED,
     UNVERIFIED,
     LlmAnswer,
     LlmCitation,
@@ -394,6 +400,13 @@ async def query(
         # it, and repeating that in a field would read as a narrower claim than
         # the refusal it sits next to -- r47.
         uncovered = draft.uncovered if grounded else None
+    elif (draft.uncovered or "").strip() and not citations and not extract_markers(draft.answer):
+        # The model named a gap but cited nothing and marked nothing. r47 still
+        # refuses to send it -- an answer resting on no source -- but the
+        # reader is told nothing was found, not that citations failed a check:
+        # there were none to check.
+        logger.info("answer named a gap but cited nothing: conversation_id=%s", conv_id)
+        answer_text, citations, grounded, uncovered = NOTHING_CITED, [], False, None
     else:
         # Not a 500. The pipeline worked; the answer failed its own check, and
         # sending it with grounded=False would still put unverifiable citations
