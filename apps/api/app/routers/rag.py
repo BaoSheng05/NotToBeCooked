@@ -50,7 +50,7 @@ from app.services.llm import (
     LlmCitation,
     generate_answer,
 )
-from app.services.prompt import build_context
+from app.services.prompt import HISTORY_TURNS, build_context, render_history
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +266,80 @@ def _resolve_citations(
     return resolved
 
 
+def _pair_turns(
+    messages: list[Message], limit: int = HISTORY_TURNS
+) -> list[tuple[str, str | None]]:
+    """The last `limit` (question, answer) pairs, oldest first. US-14.
+
+    `messages` is one conversation in time order. An answer is kept only when
+    that turn was grounded; otherwise the pair carries None and the question
+    alone, which still says what the student was asking about.
+    """
+    pairs: list[tuple[str, str | None]] = []
+    for message in messages:
+        if message.role == ChatRole.USER:
+            pairs.append((message.content, None))
+        elif pairs and pairs[-1][1] is None and message.grounded:
+            pairs[-1] = (pairs[-1][0], message.content)
+    return pairs[-limit:] if limit > 0 else []
+
+
+async def _recent_turns(
+    session: AsyncSession, conversation_id: UUID
+) -> list[tuple[str, str | None]]:
+    """Read before this turn's own user message is added, so it is not included."""
+    statement = (
+        select(Message)
+        .where(col(Message.conversation_id) == conversation_id)
+        .order_by(col(Message.created_at).desc())
+        .limit(HISTORY_TURNS * 2 + 2)
+    )
+    newest_first = list((await session.exec(statement)).all())
+    return _pair_turns(list(reversed(newest_first)))
+
+
+def _interleave(
+    first: list[RetrievedChunk], second: list[RetrievedChunk], limit: int
+) -> list[RetrievedChunk]:
+    """first[0], second[0], first[1], ... without repeats, at most `limit`."""
+    merged: list[RetrievedChunk] = []
+    seen: set[UUID] = set()
+    for pair in zip(first, second, strict=False):
+        for chunk in pair:
+            if chunk.chunk_id not in seen:
+                seen.add(chunk.chunk_id)
+                merged.append(chunk)
+    longer = first if len(first) > len(second) else second
+    for chunk in longer[min(len(first), len(second)) :]:
+        if chunk.chunk_id not in seen:
+            seen.add(chunk.chunk_id)
+            merged.append(chunk)
+    return merged[:limit]
+
+
+async def _retrieve_follow_up(
+    request: RagQueryRequest,
+    previous_question: str | None,
+    session: AsyncSession,
+    user_id: UUID,
+) -> list[RetrievedChunk]:
+    """Search for the question alone and for it joined to the previous one. US-14.
+
+    "What are its drawbacks?" has nothing in it to search for; joined to "what
+    is a lexicon?" it does. But a question that changes topic would be pulled
+    back by the old one, so both searches run and their results alternate,
+    this question's own first. No model call: two embeddings and two searches.
+    """
+    alone = await _retrieve(request, session, user_id)
+    if not previous_question:
+        return alone
+    joined_question = " ".join(f"{previous_question} {request.question}".split())
+    joined = await _retrieve(
+        request.model_copy(update={"question": joined_question}), session, user_id
+    )
+    return _interleave(alone, joined, request.top_k)
+
+
 @rag_router.post(
     "/query",
     response_model=RagAnswer,
@@ -309,6 +383,10 @@ async def query(
         )
     conv_id: UUID = conversation.id
 
+    # Read before the user turn below is added: that turn is this question,
+    # not part of the history it is asked against.
+    turns = await _recent_turns(session, conv_id) if request.conversation_id else []
+
     # 2. Record the user turn. Stores the raw multiline text exactly as sent.
     session.add(
         Message(
@@ -336,8 +414,9 @@ async def query(
             UUID(str(user_id)),
         )
     else:
-        chunks = await _retrieve(
+        chunks = await _retrieve_follow_up(
             rag_request,
+            turns[-1][0] if turns else None,
             session,
             UUID(str(user_id)),
         )
@@ -360,6 +439,7 @@ async def query(
             context=context,
             sources=selected,
             document_summary=(rag_request.intent == RagIntent.DOCUMENT_SUMMARY),
+            history=render_history(turns),
         )
     except Exception:
         # There is no retry. The user is already waiting on a chat turn and a

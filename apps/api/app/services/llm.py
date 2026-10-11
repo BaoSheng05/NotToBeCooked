@@ -166,6 +166,7 @@ async def generate_answer(
     context: str,
     sources: list[RetrievedChunk],
     document_summary: bool = False,
+    history: str = "",
 ) -> LlmAnswer:
     """Ask the model one question against one rendered source list.
 
@@ -199,7 +200,10 @@ async def generate_answer(
         system_instruction += "\n\n" + DOCUMENT_SUMMARY_INSTRUCTION
     payload = {
         "system_instruction": {"parts": [{"text": system_instruction}]},
-        "contents": [{"parts": [{"text": f"SOURCES\n\n{context}\n\nQUESTION\n\n{question}"}]}],
+        # `history` is render_history's block, or "" on a first question.
+        "contents": [
+            {"parts": [{"text": f"{history}SOURCES\n\n{context}\n\nQUESTION\n\n{question}"}]}
+        ],
         "generationConfig": {
             "temperature": 0,
             "responseMimeType": "application/json",
