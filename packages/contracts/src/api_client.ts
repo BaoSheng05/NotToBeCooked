@@ -104,6 +104,110 @@ export class ApiClient {
         return env?.VITE_API_URL || "http://localhost:8000"
     }
 
+    /** The error shapes this client throws, from a parsed error body. */
+    private toClientError(rawJson: unknown, statusText: string): ApiClientError {
+        const parsed = schemas.ApiError.safeParse(rawJson)
+        if (parsed.success) {
+            return parsed.data
+        }
+        // FastAPI's 422 body is {detail: [{loc, msg, type}, ...]}. Keeping the
+        // issues in their own field is what lets a form map them back onto
+        // individual inputs; folding them into `message` stringifies an array.
+        const detail: unknown = (rawJson as HTTPValidationError | undefined)?.detail
+        if (Array.isArray(detail)) {
+            return {
+                code: "VALIDATION_ERROR",
+                message: "Some fields are invalid",
+                detail,
+            }
+        }
+        if (typeof detail === "string") {
+            return { code: "HTTP_ERROR", message: detail }
+        }
+        const nested = (detail as ApiError | undefined)?.message
+        return { code: "HTTP_ERROR", message: nested ?? statusText }
+    }
+
+    /** One token refresh at a time, shared with request()'s 401 path. */
+    private async refreshTokenOnce(): Promise<void> {
+        if (this.isRefreshing) {
+            return new Promise<void>((resolve, reject) =>
+                this.subscribeRefresh((err) => (err ? reject(err) : resolve()))
+            )
+        }
+        this.isRefreshing = true
+        try {
+            const refreshResult = await this.auth.refresh()
+            this.isRefreshing = false
+            this.onTokenRefreshed?.(refreshResult.access_token, refreshResult.user)
+            this.onRefreshSubscribers()
+        } catch (refreshErr) {
+            this.isRefreshing = false
+            this.onRefreshSubscribers(refreshErr)
+            this.onUnauthorized?.()
+            throw refreshErr
+        }
+    }
+
+    /**
+     * POST a form with upload progress. fetch() reports no upload progress, so
+     * this is XMLHttpRequest; everything else matches request(): bearer token,
+     * cookies, one refresh-and-retry on 401, the same error shapes.
+     * `onProgress` receives 0..1 as bytes leave the browser.
+     */
+    private postFormWithProgress<T>(
+        endpoint: string,
+        body: FormData,
+        onProgress: (fraction: number) => void,
+        retried = false
+    ): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            xhr.open("POST", `${this.baseUrl}${endpoint}`)
+            xhr.withCredentials = true
+            const token = this.getToken()
+            if (token) {
+                xhr.setRequestHeader("Authorization", `Bearer ${token}`)
+            }
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable && event.total > 0) {
+                    onProgress(event.loaded / event.total)
+                }
+            }
+            xhr.onerror = () =>
+                reject({
+                    code: "NETWORK_ERROR",
+                    message: "The upload was interrupted. Check your connection and try again.",
+                } satisfies ApiClientError)
+            xhr.onload = () => {
+                let rawJson: unknown = undefined
+                try {
+                    rawJson = JSON.parse(xhr.responseText)
+                } catch {
+                    rawJson = undefined
+                }
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(rawJson as T)
+                    return
+                }
+                if (xhr.status === 401 && !retried) {
+                    this.refreshTokenOnce()
+                        .then(() =>
+                            this.postFormWithProgress<T>(endpoint, body, onProgress, true)
+                        )
+                        .then(resolve, reject)
+                    return
+                }
+                reject(
+                    rawJson === undefined
+                        ? { code: "UNKNOWN_ERROR", message: xhr.statusText }
+                        : this.toClientError(rawJson, xhr.statusText)
+                )
+            }
+            xhr.send(body)
+        })
+    }
+
         private async request<T>(
         endpoint: string,
         options: RequestInit & {
@@ -176,32 +280,7 @@ const isFormData =
         if (!response.ok) {
             let errorData: ApiClientError
             try {
-                const rawJson = await response.json()
-                const parsed = schemas.ApiError.safeParse(rawJson)
-                if (parsed.success) {
-                    errorData = parsed.data
-                } else {
-                    // FastAPI's 422 body is {detail: [{loc, msg, type}, ...]}. Keeping the
-                    // issues in their own field is what lets a form map them back onto
-                    // individual inputs; folding them into `message` stringifies an array.
-                    const detail: unknown = (rawJson as HTTPValidationError | undefined)
-                        ?.detail
-                    if (Array.isArray(detail)) {
-                        errorData = {
-                            code: "VALIDATION_ERROR",
-                            message: "Some fields are invalid",
-                            detail,
-                        }
-                    } else if (typeof detail === "string") {
-                        errorData = { code: "HTTP_ERROR", message: detail }
-                    } else {
-                        const nested = (detail as ApiError | undefined)?.message
-                        errorData = {
-                            code: "HTTP_ERROR",
-                            message: nested ?? response.statusText,
-                        }
-                    }
-                }
+                errorData = this.toClientError(await response.json(), response.statusText)
             } catch {
                 errorData = { code: "UNKNOWN_ERROR", message: response.statusText }
             }
@@ -324,10 +403,18 @@ const isFormData =
 
     // File Endpoints
     public files = {
-        upload: (folderId: string, file: File): Promise<FileRead> => {
+        upload: (
+            folderId: string,
+            file: File,
+            onProgress?: (fraction: number) => void
+        ): Promise<FileRead> => {
         const formData = new FormData()
         formData.append("folder_id", folderId)
         formData.append("upload", file)
+
+        if (onProgress) {
+            return this.postFormWithProgress<FileRead>("/files", formData, onProgress)
+        }
 
         return this.request<FileRead>("/files", {
             method: "POST",

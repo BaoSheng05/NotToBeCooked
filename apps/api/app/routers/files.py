@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -70,6 +71,12 @@ async def upload_file(
     known server-side, and asking for it only creates a way to be wrong.
     """
     user_id = UUID(user["sub"])
+    # Starts after the request body has arrived -- FastAPI parses the form
+    # before this function runs -- so the logged time is the server's share
+    # only. 11 October 2026: the acceptance test saw a 108 KB upload take over
+    # a minute on the VM, and nothing recorded where. A short time here
+    # against a long wait in the browser means the time went to the network.
+    started = time.perf_counter()
 
     # One query answers both "does this folder exist" and "does this caller own
     # it". Splitting them would mean a 404 and a 403 that together tell a
@@ -109,6 +116,12 @@ async def upload_file(
     session.add(row)
     await session.commit()
     await session.refresh(row)
+    logger.info(
+        "upload stored: file_id=%s bytes=%d server_seconds=%.2f",
+        file_id,
+        size_bytes,
+        time.perf_counter() - started,
+    )
     return row
 
 

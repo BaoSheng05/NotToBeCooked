@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "../dialog"
 import { ACCEPT_ATTRIBUTE, isSupportedUpload } from "../../lib/uploadTypes"
+import { uploadStatusLabel } from "../../lib/uploadProgress"
 
 type UploadStage = "initial" | "selected" | "uploading" | "complete"
 
@@ -35,7 +36,11 @@ interface UploadModalProps {
   initialCategory?: string
   isDirectFolderUpload?: boolean
   onClose: () => void
-  onUploadSuccess: (category: string, file: File) => Promise<void>
+  onUploadSuccess: (
+    category: string,
+    file: File,
+    onProgress: (fraction: number) => void
+  ) => Promise<void>
 }
 
 function formatFileSize(bytes: number): string {
@@ -59,6 +64,7 @@ export function UploadModal({
   const [isDragging, setIsDragging] = useState(false)
   const [validationMessages, setValidationMessages] = useState<string[]>([])
   const [requestError, setRequestError] = useState<string | null>(null)
+  const [progress, setProgress] = useState<Record<string, number>>({})
 
   const requestedCategory = categoryOverride ?? initialCategory
   const selectedCategory =
@@ -126,10 +132,15 @@ export function UploadModal({
     if (selectedFiles.length === 0 || stage === "uploading") return
     setRequestError(null)
     setStage("uploading")
+    setProgress({})
 
     try {
       await Promise.all(
-        selectedFiles.map((file) => onUploadSuccess(selectedCategory, file))
+        selectedFiles.map((file) =>
+          onUploadSuccess(selectedCategory, file, (fraction) =>
+            setProgress((prev) => ({ ...prev, [fileKey(file)]: fraction }))
+          )
+        )
       )
       setStage("complete")
     } catch (error) {
@@ -291,11 +302,21 @@ export function UploadModal({
                       <p className="font-mono text-[10px] text-(--tx-faint,#5C6976)">
                         {formatFileSize(file.size)} ·{" "}
                         {stage === "uploading"
-                          ? "Uploading…"
+                          ? uploadStatusLabel(progress[fileKey(file)])
                           : stage === "complete"
                             ? "Uploaded · Indexing"
                             : "Ready to upload"}
                       </p>
+                      {stage === "uploading" && (
+                        <div className="mt-1 h-1 overflow-hidden rounded-full bg-(--line,#25313E)">
+                          <div
+                            className="h-full bg-(--acc,#52A8EA) transition-[width]"
+                            style={{
+                              width: `${Math.round((progress[fileKey(file)] ?? 0) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                     {stage === "selected" && (
                       <Button

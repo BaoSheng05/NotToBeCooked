@@ -9,11 +9,20 @@ import {
 export function useExplorerMutations(courseId: string) {
   const queryClient = useQueryClient()
   const uploadFileMutation = useMutation({
-    mutationFn: ({ folderId, file }: { folderId: string; file: File }) =>
-      api.files.upload(folderId, file),
+    mutationFn: ({
+      folderId,
+      file,
+      onProgress,
+    }: {
+      folderId: string
+      file: File
+      onProgress?: (fraction: number) => void
+    }) => api.files.upload(folderId, file, onProgress),
 
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
+    // Not awaited: the upload is finished when the API answers, and the
+    // modal should say so then, not after the file list has been refetched.
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
         queryKey: ["courses", courseId, "files"],
       })
     },
