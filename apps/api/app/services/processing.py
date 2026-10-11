@@ -1,14 +1,22 @@
 import asyncio
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
+from sqlmodel import col, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.vector_ops import add_chunks
 from app.schemas.chunk import Chunk, ChunkCreate
+from app.schemas.file import File as FileRow
+from app.schemas.file import FileStatus
 from app.schemas.ingestion_run import IngestionRun, IngestionRunStatus
 from app.services.embeddings import embed_text
 from app.services.ingestion import count_pages, create_chunk, extract_text, ingest_document
+
+logger = logging.getLogger(__name__)
+
+INTERRUPTED_MESSAGE = "Indexing was interrupted by a server restart. Please retry."
 
 
 class NoExtractableContentError(Exception):
@@ -130,3 +138,47 @@ async def run_ingestion(
     ingestion_run.completed_at = datetime.now(UTC)
     await session.commit()
     return page_count
+
+
+async def recover_interrupted_ingestion(session: AsyncSession) -> tuple[int, int]:
+    """Fail every file and run that a restart left half-done. Called once at startup.
+
+    Ingestion runs as a BackgroundTask inside the API process, so a restart
+    kills it between two commits: FILE.status stays `processing` and the run
+    stays `queued` or `processing`, and nothing will ever move either again.
+    Found 11 October 2026 on the VM: a deploy restarted the API during a PDF's
+    parse, and the file read INDEXING for good. The explorer offers Retry only
+    on `failed` files, so the user had no way out but deleting the file.
+
+    At startup no ingestion can be running yet, so every such row is
+    interrupted, not slow. That holds while the API runs as one process, as
+    deploy/nttbc-api.service does; with several workers, one worker starting
+    would fail the work another is still doing.
+
+    Files at `uploaded` are left alone: the explorer already offers "Start
+    indexing" for them. Returns (files failed, runs failed).
+    """
+    files = await session.exec(
+        update(FileRow)
+        .where(col(FileRow.status) == FileStatus.PROCESSING)
+        .values(status=FileStatus.FAILED, error_message=INTERRUPTED_MESSAGE)
+    )
+    runs = await session.exec(
+        update(IngestionRun)
+        .where(
+            col(IngestionRun.status).in_([IngestionRunStatus.QUEUED, IngestionRunStatus.PROCESSING])
+        )
+        .values(
+            status=IngestionRunStatus.FAILED,
+            error_message="Interrupted by a server restart",
+            completed_at=datetime.now(UTC),
+        )
+    )
+    await session.commit()
+    counts = (files.rowcount, runs.rowcount)
+    if any(counts):
+        logger.warning(
+            "startup: marked %d file(s) and %d ingestion run(s) failed after a restart",
+            *counts,
+        )
+    return counts

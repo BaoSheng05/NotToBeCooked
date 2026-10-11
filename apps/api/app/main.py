@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.logging import configure_logging
-from app.db.database import engine, init_db
+from app.db.database import async_session_maker, engine, init_db
 from app.dependencies.auth import get_current_user
 from app.routers import (
     auth_router,
@@ -19,6 +19,7 @@ from app.routers import (
     milestones_router,
     rag_router,
 )
+from app.services.processing import recover_interrupted_ingestion
 
 configure_logging()
 
@@ -26,6 +27,8 @@ configure_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    async with async_session_maker() as session:
+        await recover_interrupted_ingestion(session)
     app.state.llm_client = httpx.AsyncClient(
         timeout=httpx.Timeout(connect=5.0, read=60.0, write=10.0, pool=5.0)
     )
