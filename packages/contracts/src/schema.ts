@@ -169,6 +169,31 @@ export interface paths {
         patch: operations["update_file_files__file_id__patch"];
         trace?: never;
     };
+    "/files/{file_id}/text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get File Text
+         * @description The file's active ingestion run, chunk by chunk. US-08.
+         *
+         *     Added 11 October 2026: the acceptance test found DOCX and Markdown files
+         *     could not be previewed at all -- the reader only knew how to hand a PDF to
+         *     the browser. 409 rather than 404 before indexing: the file exists, its
+         *     text just does not yet.
+         */
+        get: operations["get_file_text_files__file_id__text_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/files/{file_id}/content": {
         parameters: {
             query?: never;
@@ -654,6 +679,36 @@ export interface components {
             uploaded_at: string;
             /** Indexed At */
             indexed_at?: string | null;
+        };
+        /**
+         * FileText
+         * @description GET /files/{file_id}/text -- the text the AI reads, in document order.
+         *
+         *     The preview for every format the browser cannot render itself (DOCX, PPTX,
+         *     Markdown, plain text). It is the indexed chunks rather than the original
+         *     file on purpose: a citation's quote was verified against exactly this text,
+         *     so the reader can always find and highlight it here.
+         */
+        FileText: {
+            /**
+             * File Id
+             * Format: uuid
+             */
+            file_id: string;
+            /** Passages */
+            passages: components["schemas"]["FileTextPassage"][];
+        };
+        /**
+         * FileTextPassage
+         * @description One indexed chunk, as the reader shows it.
+         */
+        FileTextPassage: {
+            /** Page Start */
+            page_start?: number | null;
+            /** Page End */
+            page_end?: number | null;
+            /** Text */
+            text: string;
         };
         /** FileUpdate */
         FileUpdate: {
@@ -1316,6 +1371,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FileRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_file_text_files__file_id__text_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileText"];
+                };
+            };
+            /** @description The file has not been indexed yet */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

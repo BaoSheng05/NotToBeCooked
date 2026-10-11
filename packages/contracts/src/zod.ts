@@ -15,6 +15,8 @@ const Body_upload_file_files_post = z.object({ folder_id: z.string().uuid(), upl
 const FileRead = z.object({ id: z.string().uuid(), folder_id: z.string().uuid(), filename: z.string(), storage_key: z.string(), sha256: z.union([z.string(), z.null()]).optional(), mime_type: z.string(), size_bytes: z.number().int(), page_count: z.union([z.number(), z.null()]).optional(), status: z.enum(["uploaded", "processing", "ready", "failed"]), error_message: z.union([z.string(), z.null()]).optional(), uploaded_at: z.string().datetime({ offset: true }), indexed_at: z.union([z.string(), z.null()]).optional() }).passthrough();
 const IngestionResponse = z.object({ file_id: z.string().uuid(), ingestion_run_id: z.string().uuid(), status: z.enum(["queued", "processing", "ready", "failed"]), chunk_count: z.union([z.number(), z.null()]).optional(), error: z.union([z.string(), z.null()]).optional() }).passthrough();
 const FileUpdate = z.object({ filename: z.union([z.string(), z.null()]), folder_id: z.union([z.string(), z.null()]) }).partial().passthrough();
+const FileTextPassage = z.object({ page_start: z.union([z.number(), z.null()]).optional(), page_end: z.union([z.number(), z.null()]).optional(), text: z.string() }).passthrough();
+const FileText = z.object({ file_id: z.string().uuid(), passages: z.array(FileTextPassage) }).passthrough();
 const Body_replace_file_files__file_id__content_put = z.object({ upload: z.string() }).passthrough();
 const RagIntent = z.enum(["question", "document_summary"]);
 const RagQueryRequest = z.object({ question: z.string().min(1).max(2000), course_id: z.union([z.string(), z.null()]).optional(), conversation_id: z.union([z.string(), z.null()]).optional(), file_ids: z.union([z.array(z.string().uuid()), z.null()]).optional(), intent: RagIntent.optional(), top_k: z.number().int().gte(1).lte(20).optional().default(5) });
@@ -52,6 +54,8 @@ export const schemas = {
 	FileRead,
 	IngestionResponse,
 	FileUpdate,
+	FileTextPassage,
+	FileText,
 	Body_replace_file_files__file_id__content_put,
 	RagIntent,
 	RagQueryRequest,
@@ -774,6 +778,38 @@ known server-side, and asking for it only creates a way to be wrong.`,
 		],
 		response: IngestionResponse,
 		errors: [
+			{
+				status: 422,
+				description: `Validation Error`,
+				schema: HTTPValidationError
+			},
+		]
+	},
+	{
+		method: "get",
+		path: "/files/:file_id/text",
+		alias: "get_file_text_files__file_id__text_get",
+		description: `The file&#x27;s active ingestion run, chunk by chunk. US-08.
+
+Added 11 October 2026: the acceptance test found DOCX and Markdown files
+could not be previewed at all -- the reader only knew how to hand a PDF to
+the browser. 409 rather than 404 before indexing: the file exists, its
+text just does not yet.`,
+		requestFormat: "json",
+		parameters: [
+			{
+				name: "file_id",
+				type: "Path",
+				schema: z.string().uuid()
+			},
+		],
+		response: FileText,
+		errors: [
+			{
+				status: 409,
+				description: `The file has not been indexed yet`,
+				schema: z.void()
+			},
 			{
 				status: 422,
 				description: `Validation Error`,

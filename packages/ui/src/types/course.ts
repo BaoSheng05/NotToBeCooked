@@ -32,7 +32,8 @@ export interface MockDocumentFile extends ChatFile {
   size: string
   status?: FileStatus
   errorMessage?: string | null
-  previewState?: "ready" | "loading" | "error" | "unsupported"
+  /** "text": shown from the indexed text (DOCX, PPTX, Markdown, TXT). */
+  previewState?: "ready" | "loading" | "error" | "unsupported" | "text"
   previewError?: string | null
   contentByPage?: Record<number, string>
 }
